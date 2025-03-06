@@ -1,0 +1,25 @@
+[
+    {
+        "scope": "integration-azure",
+        "value": {
+          "enabled": true,
+          "description": "Azure Monitoring for __DT_TENANT_PLACEHOLDER__ on __AZURE_SUBSCRIPTION_PLACEHOLDER__",
+          "version": "0.0.1",
+          "featureSets": [
+            "microsoft_eventhub_clusters_essential",
+            "microsoft_storage_storageaccounts_fileservices_autodiscovery",
+            "microsoft_web_sites_essential",
+            "microsoft_web_sites_autodiscovery"
+          ],
+          "azure": {
+            "credentials": [
+              {
+                "description": "Azure Credentials",
+                "enabled": true,
+                "connectionId": "__CONNECTION_ID_PLACEHOLDER__"
+              }
+            ]
+          }
+        }
+      }
+  ]
