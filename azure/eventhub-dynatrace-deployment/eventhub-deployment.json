@@ -1,0 +1,262 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workloadName": {
+      "type": "string",
+      "defaultValue": "dynatrace",
+      "metadata": {
+        "description": "The workload name for resource naming (Azure CAF)"
+      }
+    },
+    "environment": {
+      "type": "string",
+      "defaultValue": "prod",
+      "allowedValues": [
+        "dev",
+        "test",
+        "staging",
+        "prod"
+      ],
+      "metadata": {
+        "description": "The environment name for resource naming (Azure CAF)"
+      }
+    },
+    "regions": {
+      "type": "array",
+      "metadata": {
+        "description": "Array of Azure regions where Event Hub namespaces will be deployed"
+      }
+    },
+    "eventHubSku": {
+      "type": "string",
+      "defaultValue": "Standard",
+      "allowedValues": [
+        "Basic",
+        "Standard",
+        "Premium"
+      ],
+      "metadata": {
+        "description": "The SKU tier for Event Hub namespace"
+      }
+    },
+    "eventHubCapacity": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 1,
+      "maxValue": 20,
+      "metadata": {
+        "description": "The throughput units for Event Hub namespace (1-20 for Standard/Basic, 1-10 for Premium)"
+      }
+    },
+    "eventHubRetentionDays": {
+      "type": "int",
+      "defaultValue": 7,
+      "minValue": 1,
+      "maxValue": 7,
+      "metadata": {
+        "description": "Number of days to retain events in Event Hub (1-7 for Standard/Basic, 1-90 for Premium)"
+      }
+    },
+    "eventHubPartitionCount": {
+      "type": "int",
+      "defaultValue": 4,
+      "minValue": 2,
+      "maxValue": 32,
+      "metadata": {
+        "description": "Number of partitions for Event Hub"
+      }
+    },
+    "dtMonitoringServicePrincipalId": {
+      "type": "string",
+      "metadata": {
+        "description": "The Object ID (not App ID) of the Dynatrace monitoring service principal for RBAC assignments"
+      }
+    },
+    "enableAutoInflate": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable auto-inflate for Event Hub namespace (Standard tier only)"
+      }
+    },
+    "maximumThroughputUnits": {
+      "type": "int",
+      "defaultValue": 0,
+      "minValue": 0,
+      "maxValue": 20,
+      "metadata": {
+        "description": "Maximum throughput units when auto-inflate is enabled (0 = disabled)"
+      }
+    },
+    "deploymentGuid": {
+      "type": "string",
+      "defaultValue": "[newGuid()]",
+      "metadata": {
+        "description": "Unique identifier for this deployment"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "purpose": "dynatrace-log-ingestion",
+        "managed-by": "arm-template"
+      },
+      "metadata": {
+        "description": "Tags to apply to all resources"
+      }
+    }
+  },
+  "variables": {
+    "eventHubName": "evh-logs-ingestion"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2021-04-01",
+      "name": "[concat('rg-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()])]",
+      "location": "[parameters('regions')[copyIndex()]]",
+      "tags": "[parameters('tags')]",
+      "copy": {
+        "name": "resourceGroupCopy",
+        "count": "[length(parameters('regions'))]"
+      },
+      "properties": {}
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2021-04-01",
+      "name": "[concat('eventhub-deployment-', parameters('regions')[copyIndex()], '-', parameters('deploymentGuid'))]",
+      "resourceGroup": "[concat('rg-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()])]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/resourceGroups', concat('rg-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()]))]"
+      ],
+      "copy": {
+        "name": "eventhubDeploymentCopy",
+        "count": "[length(parameters('regions'))]"
+      },
+      "properties": {
+        "mode": "Incremental",
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "resources": [
+            {
+              "type": "Microsoft.EventHub/namespaces",
+              "apiVersion": "2022-10-01-preview",
+              "name": "[concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()])]",
+              "location": "[parameters('regions')[copyIndex()]]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('eventHubSku')]",
+                "tier": "[parameters('eventHubSku')]",
+                "capacity": "[parameters('eventHubCapacity')]"
+              },
+              "properties": {
+                "isAutoInflateEnabled": "[if(equals(parameters('eventHubSku'), 'Standard'), parameters('enableAutoInflate'), false())]",
+                "maximumThroughputUnits": "[if(and(equals(parameters('eventHubSku'), 'Standard'), parameters('enableAutoInflate')), parameters('maximumThroughputUnits'), 0)]",
+                "zoneRedundant": "[if(equals(parameters('eventHubSku'), 'Premium'), true(), false())]"
+              }
+            },
+            {
+              "type": "Microsoft.EventHub/namespaces/eventhubs",
+              "apiVersion": "2022-10-01-preview",
+              "name": "[concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()], '/', variables('eventHubName'))]",
+              "location": "[parameters('regions')[copyIndex()]]",
+              "dependsOn": [
+                "[resourceId('Microsoft.EventHub/namespaces', concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()]))]"
+              ],
+              "properties": {
+                "messageRetentionInDays": "[parameters('eventHubRetentionDays')]",
+                "partitionCount": "[parameters('eventHubPartitionCount')]"
+              }
+            },
+            {
+              "type": "Microsoft.EventHub/namespaces/eventhubs/authorizationRules",
+              "apiVersion": "2022-10-01-preview",
+              "name": "[concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()], '/', variables('eventHubName'), '/dynatrace-listen')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.EventHub/namespaces/eventhubs', concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()]), variables('eventHubName'))]"
+              ],
+              "properties": {
+                "rights": [
+                  "Listen"
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.EventHub/namespaces/eventhubs/authorizationRules",
+              "apiVersion": "2022-10-01-preview",
+              "name": "[concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()], '/', variables('eventHubName'), '/dynatrace-send')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.EventHub/namespaces/eventhubs', concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()]), variables('eventHubName'))]"
+              ],
+              "properties": {
+                "rights": [
+                  "Send"
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.EventHub/namespaces/eventhubs/authorizationRules",
+              "apiVersion": "2022-10-01-preview",
+              "name": "[concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()], '/', variables('eventHubName'), '/dynatrace-manage')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.EventHub/namespaces/eventhubs', concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()]), variables('eventHubName'))]"
+              ],
+              "properties": {
+                "rights": [
+                  "Listen",
+                  "Send",
+                  "Manage"
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()]), parameters('dtMonitoringServicePrincipalId'), 'Azure Event Hubs Data Receiver')]",
+              "scope": "[concat('Microsoft.EventHub/namespaces/', 'evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()])]",
+              "dependsOn": [
+                "[resourceId('Microsoft.EventHub/namespaces', concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()]))]"
+              ],
+              "properties": {
+                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'a638d3c7-ab3a-418d-83e6-5f17a39d4fde')]",
+                "principalId": "[parameters('dtMonitoringServicePrincipalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()]), parameters('dtMonitoringServicePrincipalId'), 'Azure Event Hubs Data Sender')]",
+              "scope": "[concat('Microsoft.EventHub/namespaces/', 'evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()])]",
+              "dependsOn": [
+                "[resourceId('Microsoft.EventHub/namespaces', concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()]))]"
+              ],
+              "properties": {
+                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '2b629674-e913-4c01-ae53-ef4638d8f975')]",
+                "principalId": "[parameters('dtMonitoringServicePrincipalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "eventHubNamespaces": {
+      "type": "array",
+      "copy": {
+        "count": "[length(parameters('regions'))]",
+        "input": {
+          "region": "[parameters('regions')[copyIndex()]]",
+          "resourceGroup": "[concat('rg-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()])]",
+          "namespace": "[concat('evhns-', parameters('workloadName'), '-', parameters('environment'), '-', parameters('regions')[copyIndex()])]",
+          "eventHub": "[variables('eventHubName')]"
+        }
+      }
+    }
+  }
+}

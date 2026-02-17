@@ -1,0 +1,296 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "basics": [
+      {
+        "name": "workloadName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Workload Name",
+        "defaultValue": "dynatrace",
+        "toolTip": "Name of the workload for resource naming (Azure CAF)",
+        "constraints": {
+          "required": true,
+          "regex": "^[a-z0-9]{3,15}$",
+          "validationMessage": "Workload name must be 3-15 characters long and contain only lowercase letters and numbers."
+        }
+      },
+      {
+        "name": "environment",
+        "type": "Microsoft.Common.DropDown",
+        "label": "Environment",
+        "defaultValue": "prod",
+        "toolTip": "Select the environment for deployment",
+        "constraints": {
+          "required": true,
+          "allowedValues": [
+            {
+              "label": "Development",
+              "value": "dev"
+            },
+            {
+              "label": "Test",
+              "value": "test"
+            },
+            {
+              "label": "Staging",
+              "value": "staging"
+            },
+            {
+              "label": "Production",
+              "value": "prod"
+            }
+          ]
+        }
+      }
+    ],
+    "steps": [
+      {
+        "name": "regionConfiguration",
+        "label": "Region Configuration",
+        "elements": [
+          {
+            "name": "regionInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Info",
+              "text": "Select one or more Azure regions where Event Hub namespaces will be deployed. Multi-region deployment provides high availability and disaster recovery capabilities."
+            }
+          },
+          {
+            "name": "regions",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Azure Regions",
+            "placeholder": "Select regions for Event Hub deployment",
+            "multiselect": true,
+            "selectAll": false,
+            "filter": true,
+            "filterPlaceholder": "Filter regions...",
+            "multiLine": true,
+            "toolTip": "Select one or more regions for Event Hub deployment",
+            "constraints": {
+              "required": true,
+              "allowedValues": [
+                { "label": "East US", "value": "eastus" },
+                { "label": "East US 2", "value": "eastus2" },
+                { "label": "West US", "value": "westus" },
+                { "label": "West US 2", "value": "westus2" },
+                { "label": "West US 3", "value": "westus3" },
+                { "label": "Central US", "value": "centralus" },
+                { "label": "North Central US", "value": "northcentralus" },
+                { "label": "South Central US", "value": "southcentralus" },
+                { "label": "West Central US", "value": "westcentralus" },
+                { "label": "Canada Central", "value": "canadacentral" },
+                { "label": "Canada East", "value": "canadaeast" },
+                { "label": "Brazil South", "value": "brazilsouth" },
+                { "label": "North Europe", "value": "northeurope" },
+                { "label": "West Europe", "value": "westeurope" },
+                { "label": "UK South", "value": "uksouth" },
+                { "label": "UK West", "value": "ukwest" },
+                { "label": "France Central", "value": "francecentral" },
+                { "label": "Germany West Central", "value": "germanywestcentral" },
+                { "label": "Switzerland North", "value": "switzerlandnorth" },
+                { "label": "Norway East", "value": "norwayeast" },
+                { "label": "Sweden Central", "value": "swedencentral" },
+                { "label": "Southeast Asia", "value": "southeastasia" },
+                { "label": "East Asia", "value": "eastasia" },
+                { "label": "Australia East", "value": "australiaeast" },
+                { "label": "Australia Southeast", "value": "australiasoutheast" },
+                { "label": "Australia Central", "value": "australiacentral" },
+                { "label": "Japan East", "value": "japaneast" },
+                { "label": "Japan West", "value": "japanwest" },
+                { "label": "Korea Central", "value": "koreacentral" },
+                { "label": "India Central", "value": "centralindia" },
+                { "label": "India South", "value": "southindia" },
+                { "label": "India West", "value": "westindia" },
+                { "label": "UAE North", "value": "uaenorth" },
+                { "label": "South Africa North", "value": "southafricanorth" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "eventHubConfiguration",
+        "label": "Event Hub Configuration",
+        "elements": [
+          {
+            "name": "eventHubInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Info",
+              "text": "Configure Event Hub settings for Dynatrace log and event ingestion. These settings will be applied to all regional deployments."
+            }
+          },
+          {
+            "name": "eventHubSku",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Event Hub SKU",
+            "defaultValue": "Standard",
+            "toolTip": "Select the SKU tier for Event Hub namespace. Standard is recommended for production workloads.",
+            "constraints": {
+              "required": true,
+              "allowedValues": [
+                {
+                  "label": "Basic - 1-20 TU, 1-7 days retention",
+                  "value": "Basic"
+                },
+                {
+                  "label": "Standard - 1-20 TU, 1-7 days retention, Auto-Inflate",
+                  "value": "Standard"
+                },
+                {
+                  "label": "Premium - 1-10 PU, 1-90 days retention, Zone Redundant",
+                  "value": "Premium"
+                }
+              ]
+            }
+          },
+          {
+            "name": "eventHubCapacity",
+            "type": "Microsoft.Common.Slider",
+            "min": 1,
+            "max": 20,
+            "label": "Throughput Units",
+            "subLabel": "units",
+            "defaultValue": 1,
+            "toolTip": "Number of throughput units (1-20 for Standard/Basic, 1-10 for Premium)",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "eventHubRetentionDays",
+            "type": "Microsoft.Common.Slider",
+            "min": 1,
+            "max": 7,
+            "label": "Message Retention (Days)",
+            "subLabel": "days",
+            "defaultValue": 7,
+            "showStepMarkers": true,
+            "toolTip": "Number of days to retain messages (1-7 for Standard/Basic, up to 90 for Premium)",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "eventHubPartitionCount",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Partition Count",
+            "defaultValue": "4",
+            "toolTip": "Number of partitions for the Event Hub (2-32). More partitions allow higher throughput.",
+            "constraints": {
+              "required": true,
+              "allowedValues": [
+                { "label": "2", "value": "2" },
+                { "label": "4", "value": "4" },
+                { "label": "8", "value": "8" },
+                { "label": "16", "value": "16" },
+                { "label": "32", "value": "32" }
+              ]
+            }
+          },
+          {
+            "name": "enableAutoInflate",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Enable Auto-Inflate (Standard SKU only)",
+            "toolTip": "Automatically scale throughput units when limits are reached",
+            "constraints": {
+              "required": false
+            }
+          },
+          {
+            "name": "maximumThroughputUnits",
+            "type": "Microsoft.Common.Slider",
+            "min": 0,
+            "max": 20,
+            "label": "Maximum Throughput Units (Auto-Inflate)",
+            "subLabel": "units",
+            "defaultValue": 0,
+            "visible": "[steps('eventHubConfiguration').enableAutoInflate]",
+            "toolTip": "Maximum throughput units when auto-inflate is enabled (0 = disabled)",
+            "constraints": {
+              "required": false
+            }
+          }
+        ]
+      },
+      {
+        "name": "servicePrincipalConfiguration",
+        "label": "Dynatrace Service Principal",
+        "elements": [
+          {
+            "name": "servicePrincipalInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Info",
+              "text": "Provide the Dynatrace monitoring service principal details. The service principal will be granted 'Azure Event Hubs Data Receiver' and 'Azure Event Hubs Data Sender' roles on all Event Hub namespaces. Note: Use 'az ad sp show --id <app-id>' to get the Object ID from the App ID."
+            }
+          },
+          {
+            "name": "dtMonitoringServicePrincipalId",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Service Principal Object ID",
+            "toolTip": "The Object ID (not App ID/Client ID) of the Dynatrace monitoring service principal. Use 'az ad sp show --id <app-id>' to retrieve this.",
+            "placeholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            "constraints": {
+              "required": true,
+              "regex": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "validationMessage": "Must be a valid GUID (Object ID). Use 'az ad sp show --id <app-id>' to get the Object ID."
+            }
+          },
+          {
+            "name": "servicePrincipalValidation",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Warning",
+              "text": "Important: Ensure you provide the Object ID, not the Application (Client) ID. You can find the Object ID by running: az ad sp show --id <application-id> --query id -o tsv"
+            }
+          }
+        ]
+      },
+      {
+        "name": "tags",
+        "label": "Tags",
+        "elements": [
+          {
+            "name": "tagsInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Info",
+              "text": "Add custom tags to all resources. Default tags include 'purpose: dynatrace-log-ingestion' and 'managed-by: arm-template'."
+            }
+          },
+          {
+            "name": "resourceTags",
+            "type": "Microsoft.Common.TagsByResource",
+            "toolTip": "Tags to apply to all resources",
+            "resources": [
+              "Microsoft.Resources/resourceGroups",
+              "Microsoft.EventHub/namespaces"
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": {
+      "workloadName": "[basics('workloadName')]",
+      "environment": "[basics('environment')]",
+      "regions": "[steps('regionConfiguration').regions]",
+      "eventHubSku": "[steps('eventHubConfiguration').eventHubSku]",
+      "eventHubCapacity": "[steps('eventHubConfiguration').eventHubCapacity]",
+      "eventHubRetentionDays": "[steps('eventHubConfiguration').eventHubRetentionDays]",
+      "eventHubPartitionCount": "[int(steps('eventHubConfiguration').eventHubPartitionCount)]",
+      "enableAutoInflate": "[steps('eventHubConfiguration').enableAutoInflate]",
+      "maximumThroughputUnits": "[if(steps('eventHubConfiguration').enableAutoInflate, steps('eventHubConfiguration').maximumThroughputUnits, 0)]",
+      "dtMonitoringServicePrincipalId": "[steps('servicePrincipalConfiguration').dtMonitoringServicePrincipalId]",
+      "tags": "[if(contains(steps('tags'), 'resourceTags'), union(parse('{\"purpose\":\"dynatrace-log-ingestion\",\"managed-by\":\"arm-template\"}'), steps('tags').resourceTags), parse('{\"purpose\":\"dynatrace-log-ingestion\",\"managed-by\":\"arm-template\"}'))]"
+    }
+  }
+}
